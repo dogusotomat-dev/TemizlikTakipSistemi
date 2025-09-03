@@ -22,6 +22,7 @@ export const authService = {
       const userSnapshot = await get(getUserRef(user.uid));
       if (userSnapshot.exists()) {
         const userData = userSnapshot.val();
+        console.log('Firebase\'den gelen kullanıcı bilgileri:', userData);
         
         // lastLogin'i güncelle
         const currentTime = new Date().toISOString();
@@ -71,6 +72,8 @@ export const authService = {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
+      
+      console.log('Firebase\'e kaydedilecek kullanıcı:', newUser);
       
       await set(getUserRef(user.uid), newUser);
       return { success: true, user: newUser };
@@ -227,6 +230,42 @@ export const reportService = {
     } catch (error) {
       return { success: false, error: error.message };
     }
+  },
+
+  // Bayi raporlarını getir (kendisine tanımlı operasyon yetkilisi raporları)
+  async getDealerReports(dealerId) {
+    try {
+      // Önce bayi bilgilerini al
+      const dealerSnapshot = await get(getUserRef(dealerId));
+      if (!dealerSnapshot.exists()) {
+        return { success: false, error: 'Bayi bilgileri bulunamadı' };
+      }
+
+      const dealerData = dealerSnapshot.val();
+      
+      // Bayiye tanımlı operasyon yetkililerini bul
+      const assignedOperators = dealerData.assignedOperators || [];
+      
+      if (assignedOperators.length === 0) {
+        return { success: true, reports: [] };
+      }
+
+      // Bu operasyon yetkililerinin raporlarını getir
+      const reports = [];
+      for (const operatorId of assignedOperators) {
+        const operatorReports = await this.getUserReports(operatorId);
+        if (operatorReports.success) {
+          reports.push(...operatorReports.reports);
+        }
+      }
+
+      // Tarihe göre sırala (en yeni önce)
+      reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      return { success: true, reports };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   }
 };
 
@@ -291,7 +330,9 @@ export const userService = {
     } catch (error) {
       return { success: false, error: error.message };
     }
-  }
+  },
+
+
 };
 
 // Commodity Servisleri

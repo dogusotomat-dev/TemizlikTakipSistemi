@@ -98,6 +98,28 @@ const NewReport = () => {
   const navigate = useNavigate();
   const { userData, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  // Yetki kontrolü
+  useEffect(() => {
+    if (!authLoading && userData) {
+      // Operasyon sorumlusu her zaman erişebilir
+      if (userData.role === 'routeman') {
+        return;
+      }
+      
+      // Operasyon yetkilisi sadece yetkisi varsa erişebilir
+      if (userData.role === 'operator') {
+        if (!userData.permissions?.iceCream) {
+          navigate('/dashboard');
+          return;
+        }
+        return;
+      }
+      
+      // Diğer roller erişemez
+      navigate('/dashboard');
+    }
+  }, [userData, authLoading, navigate]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [countdown, setCountdown] = useState(0);

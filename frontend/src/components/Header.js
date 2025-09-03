@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppBar, Toolbar, Typography, Button, Box, Avatar, Menu, MenuItem } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Assignment, Dashboard, AdminPanelSettings, Person, Logout, ListAlt, Kitchen } from '@mui/icons-material';
+import { Assignment, Dashboard, AdminPanelSettings, Person, Logout, Kitchen } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
 const Header = () => {
@@ -55,20 +55,10 @@ const Header = () => {
               >
                 Admin Paneli
               </Button>
-              <Button
-                color="inherit"
-                startIcon={<ListAlt />}
-                onClick={() => navigate('/')}
-                sx={{ 
-                  backgroundColor: location.pathname === '/' ? 'rgba(255,255,255,0.1)' : 'transparent' 
-                }}
-              >
-                Raporlar
-              </Button>
             </>
           )}
           
-          {(userData.role === 'routeman' || userData.role === 'viewer') && (
+          {(userData.role === 'routeman' || userData.role === 'operator' || userData.role === 'dealer' || userData.role === 'viewer') && (
             <>
               <Button
                 color="inherit"
@@ -80,49 +70,75 @@ const Header = () => {
               >
                 Ana Sayfa
               </Button>
-              {userData.role === 'viewer' && (
-                <Button
-                  color="inherit"
-                  startIcon={<AdminPanelSettings />}
-                  onClick={() => navigate('/admin')}
-                  sx={{ 
-                    backgroundColor: location.pathname === '/admin' ? 'rgba(255,255,255,0.1)' : 'transparent' 
-                  }}
-                >
-                  Raporlar (Admin)
-                </Button>
-              )}
             </>
           )}
           
-          {userData.role === 'routeman' && (
+          {(userData.role === 'routeman' || userData.role === 'operator') && (
             <>
-              <Button
-                color="inherit"
-                startIcon={<Assignment />}
-                onClick={() => navigate('/new-report')}
-                sx={{ 
-                  backgroundColor: location.pathname === '/new-report' ? 'rgba(255,255,255,0.1)' : 'transparent' 
-                }}
-              >
-                Dondurma Temizlik
-              </Button>
-              <Button
-                color="inherit"
-                startIcon={<Kitchen />}
-                onClick={() => navigate('/new-fridge-report')}
-                sx={{ 
-                  backgroundColor: location.pathname === '/new-fridge-report' ? 'rgba(255,255,255,0.1)' : 'transparent' 
-                }}
-              >
-                Taze Dolap Dolum
-              </Button>
+              {/* Operasyon sorumlusu tüm formları görebilir */}
+              {userData.role === 'routeman' && (
+                <>
+                  <Button
+                    color="inherit"
+                    startIcon={<Assignment />}
+                    onClick={() => navigate('/new-report')}
+                    sx={{ 
+                      backgroundColor: location.pathname === '/new-report' ? 'rgba(255,255,255,0.1)' : 'transparent' 
+                    }}
+                  >
+                    Dondurma Temizlik
+                  </Button>
+                  <Button
+                    color="inherit"
+                    startIcon={<Kitchen />}
+                    onClick={() => navigate('/new-fridge-report')}
+                    sx={{ 
+                      backgroundColor: location.pathname === '/new-fridge-report' ? 'rgba(255,255,255,0.1)' : 'transparent' 
+                    }}
+                  >
+                    Taze Dolap Dolum
+                  </Button>
+                </>
+              )}
+              
+              {/* Operasyon yetkilisi sadece yetkili olduğu formları görebilir */}
+              {userData.role === 'operator' && (
+                <>
+                  {userData.permissions?.iceCream && (
+                    <Button
+                      color="inherit"
+                      startIcon={<Assignment />}
+                      onClick={() => navigate('/new-report')}
+                      sx={{ 
+                        backgroundColor: location.pathname === '/new-report' ? 'rgba(255,255,255,0.1)' : 'transparent' 
+                      }}
+                    >
+                      Dondurma Temizlik
+                    </Button>
+                  )}
+                  {userData.permissions?.fridge && (
+                    <Button
+                      color="inherit"
+                      startIcon={<Kitchen />}
+                      onClick={() => navigate('/new-fridge-report')}
+                      sx={{ 
+                        backgroundColor: location.pathname === '/new-fridge-report' ? 'rgba(255,255,255,0.1)' : 'transparent' 
+                      }}
+                    >
+                      Taze Dolap Dolum
+                    </Button>
+                  )}
+                </>
+              )}
             </>
           )}
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" color="inherit">
-              {userData.name}
+              {userData.name} ({userData.role === 'admin' ? 'Admin' : 
+                               userData.role === 'routeman' ? 'Operasyon Sorumlusu' : 
+                               userData.role === 'operator' ? 'Operasyon Yetkilisi' :
+                               userData.role === 'dealer' ? 'Bayi' : 'İzleyici'})
             </Typography>
             <Avatar 
               sx={{ width: 32, height: 32, cursor: 'pointer' }} 
@@ -146,26 +162,45 @@ const Header = () => {
             horizontal: 'right',
           }}
         >
-          <MenuItem onClick={() => handleNavigate('/')}>
-            <Dashboard sx={{ mr: 1 }} />
-            Ana Sayfa
-          </MenuItem>
           {userData.role === 'admin' && (
-                      <MenuItem onClick={() => handleNavigate('/admin')}>
-            <AdminPanelSettings sx={{ mr: 1 }} />
-            Admin Paneli
-          </MenuItem>
+            <MenuItem onClick={() => handleNavigate('/admin')}>
+              <AdminPanelSettings sx={{ mr: 1 }} />
+              Admin Paneli
+            </MenuItem>
           )}
-          {userData.role === 'routeman' && (
+          {(userData.role === 'routeman' || userData.role === 'operator') && (
             <>
-              <MenuItem onClick={() => handleNavigate('/new-report')}>
-                <Assignment sx={{ mr: 1 }} />
-                Dondurma Temizlik
-              </MenuItem>
-              <MenuItem onClick={() => handleNavigate('/new-fridge-report')}>
-                <Kitchen sx={{ mr: 1 }} />
-                Taze Dolap Dolum
-              </MenuItem>
+              {/* Operasyon sorumlusu tüm formları görebilir */}
+              {userData.role === 'routeman' && (
+                <>
+                  <MenuItem onClick={() => handleNavigate('/new-report')}>
+                    <Assignment sx={{ mr: 1 }} />
+                    Dondurma Temizlik
+                  </MenuItem>
+                  <MenuItem onClick={() => handleNavigate('/new-fridge-report')}>
+                    <Kitchen sx={{ mr: 1 }} />
+                    Taze Dolap Dolum
+                  </MenuItem>
+                </>
+              )}
+              
+              {/* Operasyon yetkilisi sadece yetkili olduğu formları görebilir */}
+              {userData.role === 'operator' && (
+                <>
+                  {userData.permissions?.iceCream && (
+                    <MenuItem onClick={() => handleNavigate('/new-report')}>
+                      <Assignment sx={{ mr: 1 }} />
+                      Dondurma Temizlik
+                    </MenuItem>
+                  )}
+                  {userData.permissions?.fridge && (
+                    <MenuItem onClick={() => handleNavigate('/new-fridge-report')}>
+                      <Kitchen sx={{ mr: 1 }} />
+                      Taze Dolap Dolum
+                    </MenuItem>
+                  )}
+                </>
+              )}
             </>
           )}
           <MenuItem onClick={handleLogout}>

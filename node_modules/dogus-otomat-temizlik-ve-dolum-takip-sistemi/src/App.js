@@ -96,17 +96,17 @@ const AppRoutes = () => {
           </ProtectedRoute>
         } />
         <Route path="/new-report" element={
-          <ProtectedRoute allowedRoles={['routeman']}>
+          <ProtectedRoute allowedRoles={['routeman', 'operator']}>
             <NewReport />
           </ProtectedRoute>
         } />
         <Route path="/new-fridge-report" element={
-          <ProtectedRoute allowedRoles={['routeman']}>
+          <ProtectedRoute allowedRoles={['routeman', 'operator']}>
             <NewFridgeReport />
           </ProtectedRoute>
         } />
         <Route path="/dashboard" element={
-          <ProtectedRoute allowedRoles={['routeman', 'viewer']}>
+          <ProtectedRoute allowedRoles={['routeman', 'operator', 'dealer', 'viewer']}>
             <Dashboard />
           </ProtectedRoute>
         } />

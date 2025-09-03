@@ -43,12 +43,36 @@ const Dashboard = () => {
       }
       
       if (userData?.role === 'routeman') {
-        // Routeman sadece kendi raporlarını görebilir
+        // Operasyon sorumlusu sadece kendi raporlarını görebilir
         if (!userData.uid) {
           setError('Kullanıcı kimliği bulunamadı. Lütfen tekrar giriş yapın.');
           return;
         }
         const result = await reportService.getUserReports(userData.uid);
+        if (result.success) {
+          setReports(result.reports || []);
+        } else {
+          setError('Raporlar yüklenemedi: ' + result.error);
+        }
+      } else if (userData?.role === 'operator') {
+        // Operasyon yetkilisi sadece kendi raporlarını görebilir
+        if (!userData.uid) {
+          setError('Kullanıcı kimliği bulunamadı. Lütfen tekrar giriş yapın.');
+          return;
+        }
+        const result = await reportService.getUserReports(userData.uid);
+        if (result.success) {
+          setReports(result.reports || []);
+        } else {
+          setError('Raporlar yüklenemedi: ' + result.error);
+        }
+      } else if (userData?.role === 'dealer') {
+        // Bayi sadece kendisine tanımlı operasyon yetkilisi raporlarını görebilir
+        if (!userData.uid) {
+          setError('Kullanıcı kimliği bulunamadı. Lütfen tekrar giriş yapın.');
+          return;
+        }
+        const result = await reportService.getDealerReports(userData.uid);
         if (result.success) {
           setReports(result.reports || []);
         } else {
@@ -344,31 +368,66 @@ const Dashboard = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+
+      
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Dashboard
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-          {userData.role === 'routeman' && (
+          {(userData.role === 'routeman' || userData.role === 'operator') && (
             <>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => navigate('/new-report')}
-                fullWidth={false}
-                sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
-              >
-                Yeni Dondurma Raporu
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => navigate('/new-fridge-report')}
-                fullWidth={false}
-                sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
-              >
-                Yeni Taze Dolap Raporu
-              </Button>
+              {/* Operasyon sorumlusu tüm formları doldurabilir */}
+              {userData.role === 'routeman' && (
+                <>
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => navigate('/new-report')}
+                    fullWidth={false}
+                    sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+                  >
+                    Yeni Dondurma Raporu
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => navigate('/new-fridge-report')}
+                    fullWidth={false}
+                    sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+                  >
+                    Yeni Taze Dolap Raporu
+                  </Button>
+                </>
+              )}
+              
+              {/* Operasyon yetkilisi sadece yetkili olduğu formları doldurabilir */}
+              {userData.role === 'operator' && (
+                <>
+                  {userData.permissions?.iceCream && (
+                    <Button
+                      variant="contained"
+                      startIcon={<Add />}
+                      onClick={() => navigate('/new-report')}
+                      fullWidth={false}
+                      sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+                    >
+                      Yeni Dondurma Raporu
+                    </Button>
+                  )}
+                  {userData.permissions?.fridge && (
+                    <Button
+                      variant="contained"
+                      startIcon={<Add />}
+                      onClick={() => navigate('/new-fridge-report')}
+                      fullWidth={false}
+                      sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+                    >
+                      Yeni Taze Dolap Raporu
+                    </Button>
+                  )}
+                </>
+              )}
             </>
           )}
           <Button

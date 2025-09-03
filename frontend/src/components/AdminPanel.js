@@ -70,7 +70,11 @@ const AdminPanel = () => {
     email: '',
     password: '',
     name: '',
-    role: 'viewer'
+    role: 'dealer', // Varsayılan olarak bayi seç
+    permissions: {
+      iceCream: false,
+      fridge: false
+    }
   });
   // Kullanıcı düzenleme formu
   const [editingUser, setEditingUser] = useState(null);
@@ -78,7 +82,11 @@ const AdminPanel = () => {
   const [editFormData, setEditFormData] = useState({
     name: '',
     role: 'viewer',
-    isActive: true
+    isActive: true,
+    permissions: {
+      iceCream: false,
+      fridge: false
+    }
   });
   // Sayfalama durumu
   const [page, setPage] = useState(0);
@@ -86,6 +94,65 @@ const AdminPanel = () => {
   // Commodity sayfalama durumu
   const [commodityPage, setCommodityPage] = useState(0);
   const [commodityRowsPerPage, setCommodityRowsPerPage] = useState(10);
+  
+  // Bayi yönetimi state'leri
+  const [dealers, setDealers] = useState([]);
+  const [operators, setOperators] = useState([]);
+  const [selectedDealer, setSelectedDealer] = useState(null);
+  const [dealerAssignmentOpen, setDealerAssignmentOpen] = useState(false);
+
+  // Kullanıcı silme fonksiyonu
+  const handleDeleteUser = async (userId, userName) => {
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      
+      // Kullanıcının kendisini silmesini engelle
+      if (userId === userData?.uid) {
+        setError('Kendi hesabınızı silemezsiniz!');
+        return;
+      }
+      
+      const result = await userService.deleteUser(userId);
+      
+      if (result.success) {
+        setSuccess(`"${userName}" kullanıcısı başarıyla silindi!`);
+        fetchUsers(); // Kullanıcıları yenile
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setError('Kullanıcı silinemedi: ' + result.error);
+      }
+    } catch (error) {
+      setError('Kullanıcı silinirken hata oluştu: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Kullanıcı silme onay dialog'u için state
+  const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+
+  // Kullanıcı silme onay dialog'unu aç
+  const handleDeleteUserConfirm = (userId, userName) => {
+    setUserToDelete({ id: userId, name: userName });
+    setDeleteUserDialogOpen(true);
+  };
+
+  // Kullanıcı silme onay dialog'unu kapat
+  const handleCloseDeleteUserDialog = () => {
+    setDeleteUserDialogOpen(false);
+    setUserToDelete(null);
+  };
+
+  // Kullanıcı silme işlemini onayla
+  const handleConfirmDeleteUser = async () => {
+    if (userToDelete) {
+      await handleDeleteUser(userToDelete.id, userToDelete.name);
+      handleCloseDeleteUserDialog();
+    }
+  };
 
   // Fonksiyonları önce tanımla
   const fetchReports = useCallback(async () => {
@@ -126,6 +193,22 @@ const AdminPanel = () => {
       }
     } catch (error) {
       setCommodities([]); // Boş liste olarak ayarla
+    }
+  }, []);
+
+  const fetchDealersAndOperators = useCallback(async () => {
+    try {
+      const result = await userService.getAllUsers();
+      if (result.success) {
+        const allUsers = result.users || [];
+        const dealers = allUsers.filter(user => user.role === 'dealer');
+        const operators = allUsers.filter(user => user.role === 'operator');
+        setDealers(dealers);
+        setOperators(operators);
+      }
+    } catch (error) {
+      setDealers([]);
+      setOperators([]);
     }
   }, []);
 
@@ -329,8 +412,9 @@ const AdminPanel = () => {
       fetchReports();
       fetchUsers();
       fetchCommodities();
+      fetchDealersAndOperators();
     }
-  }, [fetchReports, fetchUsers, fetchCommodities, userData]);
+  }, [fetchReports, fetchUsers, fetchCommodities, fetchDealersAndOperators, userData]);
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -346,21 +430,44 @@ const AdminPanel = () => {
         setError('Şifre en az 6 karakter olmalıdır.');
         return;
       }
+      // Operasyon yetkilisi için en az bir yetki kontrolü
+      if (newUser.role === 'operator' && !newUser.permissions.iceCream && !newUser.permissions.fridge) {
+        setError('Operasyon yetkilisi için en az bir form yetkisi seçilmelidir.');
+        return;
+      }
+      // Bayi ve izleyici için permissions alanını kaldır
+      const userDataToSend = {
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role
+      };
+      
+      // Sadece operasyon yetkilisi için permissions ekle
+      if (newUser.role === 'operator') {
+        userDataToSend.permissions = newUser.permissions;
+        console.log('Operasyon yetkilisi için permissions:', newUser.permissions);
+      }
+      
+      // Bayi için assignedOperators alanını ekle
+      if (newUser.role === 'dealer') {
+        userDataToSend.assignedOperators = [];
+      }
+      
       const result = await authService.createUser(
         newUser.email,
         newUser.password,
-        {
-          email: newUser.email,
-          name: newUser.name,
-          role: newUser.role
-        }
+        userDataToSend
       );
       if (result.success) {
         setNewUser({
           email: '',
           password: '',
           name: '',
-          role: 'routeman'
+          role: 'dealer', // Varsayılan olarak bayi seç
+          permissions: {
+            iceCream: false,
+            fridge: false
+          }
         });
         setSuccess('Kullanıcı başarıyla oluşturuldu!');
         fetchUsers();
@@ -401,7 +508,11 @@ const AdminPanel = () => {
     setEditFormData({
       name: user.name || '',
       role: user.role || 'routeman',
-      isActive: user.isActive !== false
+      isActive: user.isActive !== false,
+      permissions: {
+        iceCream: user.permissions?.iceCream || false,
+        fridge: user.permissions?.fridge || false
+      }
     });
     setEditFormOpen(true);
   };
@@ -410,10 +521,18 @@ const AdminPanel = () => {
   const handleSaveUserEdit = async () => {
     try {
       setLoading(true);
+      
+      // Operasyon yetkilisi için en az bir yetki kontrolü
+      if (editFormData.role === 'operator' && !editFormData.permissions.iceCream && !editFormData.permissions.fridge) {
+        setError('Operasyon yetkilisi için en az bir form yetkisi seçilmelidir.');
+        return;
+      }
+      
       const result = await userService.updateUser(editingUser.id, {
         name: editFormData.name,
         role: editFormData.role,
         isActive: editFormData.isActive,
+        permissions: editFormData.permissions,
         updatedAt: new Date().toISOString()
       });
       if (result.success) {
@@ -439,7 +558,11 @@ const AdminPanel = () => {
     setEditFormData({
       name: '',
       role: 'routeman',
-      isActive: true
+      isActive: true,
+      permissions: {
+        iceCream: false,
+        fridge: false
+      }
     });
   };
 
@@ -549,6 +672,40 @@ const AdminPanel = () => {
       'Type': '',
       'Description': ''
     });
+  };
+
+  // Bayi yönetimi fonksiyonları
+  const handleAssignOperators = (dealer) => {
+    setSelectedDealer(dealer);
+    setDealerAssignmentOpen(true);
+  };
+
+  const handleSaveOperatorAssignment = async (assignedOperatorIds) => {
+    try {
+      setLoading(true);
+      const result = await userService.updateUser(selectedDealer.id, {
+        assignedOperators: assignedOperatorIds,
+        updatedAt: new Date().toISOString()
+      });
+      if (result.success) {
+        fetchDealersAndOperators();
+        setSuccess('Operasyon yetkilileri başarıyla atandı!');
+        setTimeout(() => setSuccess(''), 3000);
+        setDealerAssignmentOpen(false);
+        setSelectedDealer(null);
+      } else {
+        setError(result.error);
+      }
+    } catch (error) {
+      setError('Operasyon yetkilileri atanamadı.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseDealerAssignment = () => {
+    setDealerAssignmentOpen(false);
+    setSelectedDealer(null);
   };
 
   const handleDeleteCommodity = async (commodityId) => {
@@ -833,6 +990,7 @@ const AdminPanel = () => {
           <Tab label="Raporlar" />
           <Tab label="Kullanıcı Ekle" />
           <Tab label="Kullanıcı Listesi" />
+          <Tab label="Bayi Yönetimi" />
           <Tab label="Ürün Yönetimi" />
         </Tabs>
 
@@ -1355,16 +1513,66 @@ const AdminPanel = () => {
                   disabled={loading}
                 >
                   <MenuItem value="routeman">Operasyon Sorumlusu</MenuItem>
+                  <MenuItem value="operator">Operasyon Yetkilisi</MenuItem>
+                  <MenuItem value="dealer">Bayi</MenuItem>
                   <MenuItem value="viewer">İzleyici</MenuItem>
                   <MenuItem value="admin">Admin</MenuItem>
                 </Select>
               </FormControl>
+              
+              {/* Yetki Checkbox'ları - Sadece operasyon yetkilisi için */}
+              {newUser.role === 'operator' && (
+                <Box sx={{ mb: 2, p: 2, border: '1px solid #ccc', borderRadius: 1, backgroundColor: '#f5f5f5' }}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                    🔐 Form Yetkileri (Operasyon Yetkilisi için Zorunlu)
+                  </Typography>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={newUser.permissions.iceCream}
+                        onChange={(e) => setNewUser({
+                          ...newUser,
+                          permissions: { ...newUser.permissions, iceCream: e.target.checked }
+                        })}
+                        disabled={loading}
+                      />
+                    }
+                    label="Dondurma Temizlik Formu"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={newUser.permissions.fridge}
+                        onChange={(e) => setNewUser({
+                          ...newUser,
+                          permissions: { ...newUser.permissions, fridge: e.target.checked }
+                        })}
+                        disabled={loading}
+                      />
+                    }
+                    label="Taze Dolap Dolum Formu"
+                  />
+                  {!newUser.permissions.iceCream && !newUser.permissions.fridge && (
+                    <Alert severity="warning" sx={{ mt: 1 }}>
+                      ⚠️ En az bir form yetkisi seçilmelidir!
+                    </Alert>
+                  )}
+                </Box>
+              )}
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
                 sx={{ mt: 3 }}
                 disabled={loading || !newUser.email || !newUser.password || !newUser.name}
+                onClick={() => {
+                  console.log('Form submit edildi:', {
+                    email: newUser.email,
+                    name: newUser.name,
+                    role: newUser.role,
+                    permissions: newUser.permissions
+                  });
+                }}
               >
                 {loading ? (
                   <>
@@ -1412,11 +1620,17 @@ const AdminPanel = () => {
                         <Typography 
                           variant="body2" 
                           sx={{ 
-                            color: user.role === 'admin' ? 'primary.main' : user.role === 'routeman' ? 'success.main' : 'warning.main',
+                            color: user.role === 'admin' ? 'primary.main' : 
+                                   user.role === 'routeman' ? 'success.main' : 
+                                   user.role === 'operator' ? 'info.main' :
+                                   user.role === 'dealer' ? 'secondary.main' : 'warning.main',
                             fontWeight: user.role === 'admin' ? 'bold' : 'normal'
                           }}
                         >
-                          {user.role === 'admin' ? 'Admin' : user.role === 'routeman' ? 'Operasyon Sorumlusu' : 'İzleyici'}
+                          {user.role === 'admin' ? 'Admin' : 
+                           user.role === 'routeman' ? 'Operasyon Sorumlusu' : 
+                           user.role === 'operator' ? 'Operasyon Yetkilisi' :
+                           user.role === 'dealer' ? 'Bayi' : 'İzleyici'}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -1463,6 +1677,16 @@ const AdminPanel = () => {
                           >
                             {user.isActive ? 'Pasif Yap' : 'Aktif Yap'}
                           </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => handleDeleteUserConfirm(user.id, user.name)}
+                            disabled={loading || user.id === userData?.uid}
+                            startIcon={<Delete />}
+                          >
+                            Sil
+                          </Button>
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -1482,8 +1706,109 @@ const AdminPanel = () => {
           </Box>
         )}
 
-        {/* Tab 3: Ürün Yönetimi */}
+        {/* Tab 3: Bayi Yönetimi */}
         {activeTab === 3 && (
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Bayi Yönetimi ({dealers.length} Bayi)
+            </Typography>
+            {loading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+              </Box>
+            )}
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Ad Soyad</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Durum</TableCell>
+                    <TableCell>Atanmış Operasyon Yetkilileri</TableCell>
+                    <TableCell>İşlemler</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {dealers.map((dealer) => (
+                    <TableRow key={dealer.id}>
+                      <TableCell>{dealer.name}</TableCell>
+                      <TableCell>{dealer.email}</TableCell>
+                      <TableCell>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={dealer.isActive}
+                              onChange={() => toggleUserStatus(dealer.id, dealer.isActive)}
+                              color="primary"
+                              disabled={loading}
+                            />
+                          }
+                          label={dealer.isActive ? 'Aktif' : 'Pasif'}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {dealer.assignedOperators && dealer.assignedOperators.length > 0 ? (
+                          <Box>
+                            {dealer.assignedOperators.map((operatorId, index) => {
+                              const operator = operators.find(op => op.id === operatorId);
+                              return (
+                                <Chip
+                                  key={operatorId}
+                                  label={operator ? operator.name : `ID: ${operatorId}`}
+                                  size="small"
+                                  sx={{ mr: 0.5, mb: 0.5 }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="textSecondary">
+                            Atanmamış
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleAssignOperators(dealer)}
+                            disabled={loading}
+                            startIcon={<Edit />}
+                          >
+                            Operasyon Yetkilileri Ata
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => handleDeleteUserConfirm(dealer.id, dealer.name)}
+                            disabled={loading || dealer.id === userData?.uid}
+                            startIcon={<Delete />}
+                          >
+                            Sil
+                          </Button>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {dealers.length === 0 && !loading && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        <Typography color="textSecondary">
+                          Henüz bayi bulunmuyor
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        )}
+
+        {/* Tab 4: Ürün Yönetimi */}
+        {activeTab === 4 && (
           <Box sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Typography variant="h6" gutterBottom>
@@ -2258,10 +2583,52 @@ const AdminPanel = () => {
                 disabled={loading}
               >
                 <MenuItem value="routeman">Operasyon Sorumlusu</MenuItem>
+                <MenuItem value="operator">Operasyon Yetkilisi</MenuItem>
+                <MenuItem value="dealer">Bayi</MenuItem>
                 <MenuItem value="viewer">İzleyici</MenuItem>
                 <MenuItem value="admin">Admin</MenuItem>
               </Select>
             </FormControl>
+            
+            {/* Yetki Checkbox'ları - Sadece operasyon yetkilisi için */}
+            {editFormData.role === 'operator' && (
+              <Box sx={{ mb: 2, p: 2, border: '1px solid #ccc', borderRadius: 1, backgroundColor: '#f5f5f5' }}>
+                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                  🔐 Form Yetkileri (Operasyon Yetkilisi için Zorunlu)
+                </Typography>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={editFormData.permissions.iceCream}
+                      onChange={(e) => setEditFormData({
+                        ...editFormData,
+                        permissions: { ...editFormData.permissions, iceCream: e.target.checked }
+                      })}
+                      disabled={loading}
+                    />
+                  }
+                  label="Dondurma Temizlik Formu"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={editFormData.permissions.fridge}
+                      onChange={(e) => setEditFormData({
+                        ...editFormData,
+                        permissions: { ...editFormData.permissions, fridge: e.target.checked }
+                      })}
+                      disabled={loading}
+                    />
+                  }
+                  label="Taze Dolap Dolum Formu"
+                />
+                {!editFormData.permissions.iceCream && !editFormData.permissions.fridge && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    ⚠️ En az bir form yetkisi seçilmelidir!
+                  </Alert>
+                )}
+              </Box>
+            )}
             <FormControlLabel
               control={
                 <Switch
@@ -2297,6 +2664,69 @@ const AdminPanel = () => {
             disabled={loading || !editFormData.name.trim()}
           >
             {loading ? 'Güncelleniyor...' : 'Güncelle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Operasyon Yetkilisi Atama Dialog */}
+      <Dialog
+        open={dealerAssignmentOpen}
+        onClose={handleCloseDealerAssignment}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Operasyon Yetkilileri Ata: {selectedDealer?.name}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body1" gutterBottom>
+              Bu bayiye atanacak operasyon yetkililerini seçin:
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              {operators.map((operator) => (
+                <FormControlLabel
+                  key={operator.id}
+                  control={
+                    <Checkbox
+                      checked={selectedDealer?.assignedOperators?.includes(operator.id) || false}
+                      onChange={(e) => {
+                        const currentAssigned = selectedDealer?.assignedOperators || [];
+                        const newAssigned = e.target.checked
+                          ? [...currentAssigned, operator.id]
+                          : currentAssigned.filter(id => id !== operator.id);
+                        
+                        setSelectedDealer({
+                          ...selectedDealer,
+                          assignedOperators: newAssigned
+                        });
+                      }}
+                      disabled={loading}
+                    />
+                  }
+                  label={`${operator.name} (${operator.email})`}
+                  sx={{ display: 'block', mb: 1 }}
+                />
+              ))}
+              {operators.length === 0 && (
+                <Alert severity="info">
+                  Henüz operasyon yetkilisi bulunmuyor. Önce "Kullanıcı Ekle" sekmesinden operasyon yetkilisi oluşturun.
+                </Alert>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDealerAssignment}>
+            İptal
+          </Button>
+          <Button 
+            onClick={() => handleSaveOperatorAssignment(selectedDealer?.assignedOperators || [])} 
+            color="primary" 
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? 'Atanıyor...' : 'Ata'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2412,6 +2842,39 @@ const AdminPanel = () => {
             disabled={loading || !commodityEditFormData['Commodity code'].trim() || !commodityEditFormData['Product name'].trim()}
           >
             {loading ? 'Güncelleniyor...' : 'Güncelle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Kullanıcı Silme Onay Dialog */}
+      <Dialog
+        open={deleteUserDialogOpen}
+        onClose={handleCloseDeleteUserDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Kullanıcı Silme Onayı
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            "{userToDelete?.name}" kullanıcısını silmek istediğinizden emin misiniz?
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Bu işlem geri alınamaz! Kullanıcı ve tüm raporları kalıcı olarak silinecektir.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteUserDialog}>
+            İptal
+          </Button>
+          <Button 
+            onClick={handleConfirmDeleteUser} 
+            color="error" 
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? 'Siliniyor...' : 'Evet, Sil'}
           </Button>
         </DialogActions>
       </Dialog>

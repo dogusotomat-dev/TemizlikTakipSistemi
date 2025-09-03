@@ -99,6 +99,28 @@ const cleanLocation = (location) => {
 const NewFridgeReport = () => {
   const navigate = useNavigate();
   const { userData, loading: authLoading } = useAuth();
+
+  // Yetki kontrolü
+  useEffect(() => {
+    if (!authLoading && userData) {
+      // Operasyon sorumlusu her zaman erişebilir
+      if (userData.role === 'routeman') {
+        return;
+      }
+      
+      // Operasyon yetkilisi sadece yetkisi varsa erişebilir
+      if (userData.role === 'operator') {
+        if (!userData.permissions?.fridge) {
+          navigate('/dashboard');
+          return;
+        }
+        return;
+      }
+      
+      // Diğer roller erişemez
+      navigate('/dashboard');
+    }
+  }, [userData, authLoading, navigate]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
