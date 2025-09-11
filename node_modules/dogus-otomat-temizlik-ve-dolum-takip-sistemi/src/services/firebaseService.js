@@ -164,11 +164,63 @@ export const reportService = {
     }
   },
 
+  // Günlük rapor sayısını al
+  async getDailyReportCount() {
+    try {
+      const snapshot = await get(getReportsRef());
+      if (snapshot.exists()) {
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD formatı
+        let count = 0;
+        
+        snapshot.forEach((childSnapshot) => {
+          const report = childSnapshot.val();
+          // Raporun oluşturulma tarihini kontrol et
+          if (report.createdAt && report.createdAt.startsWith(today)) {
+            count++;
+          }
+        });
+        
+        return count;
+      }
+      return 0;
+    } catch (error) {
+      return 0;
+    }
+  },
+
+  // Rapor ID'si oluştur (DGS-(Rapor numarası)(Yıl)(Ay)(Gün) formatında)
+  async generateReportId() {
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const dateStr = `${year}${month}${day}`;
+      
+      // Günlük rapor sayısını al
+      const dailyCount = await this.getDailyReportCount();
+      // Sıradaki rapor numarası (3 haneli)
+      const nextNumber = String(dailyCount + 1).padStart(3, '0');
+      
+      return `DGS-${nextNumber}${dateStr}`;
+    } catch (error) {
+      // Hata durumunda rastgele ID oluştur
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const dateStr = `${year}${month}${day}`;
+      const randomNumber = Math.floor(Math.random() * 900) + 100;
+      
+      return `DGS-${randomNumber}${dateStr}`;
+    }
+  },
+
   // Rapor oluştur
   async createReport(reportData) {
     try {
-      const newReportRef = push(getReportsRef());
-      const reportId = newReportRef.key;
+      // Yeni rapor ID formatı oluştur
+      const reportId = await this.generateReportId();
       
       const report = {
         id: reportId,
@@ -177,7 +229,9 @@ export const reportService = {
         updatedAt: new Date().toISOString()
       };
 
-      await set(newReportRef, report);
+      // Raporu belirli ID ile kaydet
+      const reportRef = getReportRef(reportId);
+      await set(reportRef, report);
       
       return { success: true, reportId, report };
     } catch (error) {

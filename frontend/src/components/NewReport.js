@@ -412,15 +412,6 @@ const NewReport = () => {
     }
   };
 
-  // Rapor başlığı oluştur
-  const generateReportTitle = () => {
-      const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
-    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, ''); // HHMMSS
-    
-    return `${cleanLocation(formData.location)}-${formData.machineSerialNumber}-${dateStr}${timeStr}`;
-  };
-
   // Rapor gönder
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -530,7 +521,6 @@ const NewReport = () => {
         afterPhotos: photoUploads.filter(p => p.type === 'after').map(p => p.url),
         issuePhotos: photoUploads.filter(p => p.type === 'issue').map(p => p.url),
         status: hasIssue ? 'issue' : hasWaste ? 'waste' : 'completed',
-        title: generateReportTitle(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         userId: userData.uid, // Kullanıcı ID'sini otomatik ekle
