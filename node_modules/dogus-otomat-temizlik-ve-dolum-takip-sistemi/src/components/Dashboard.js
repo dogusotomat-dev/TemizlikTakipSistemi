@@ -6,8 +6,7 @@ import {
   TablePagination, Checkbox, FormControlLabel
 } from '@mui/material';
 import { 
-  Visibility, ExpandMore, ExpandLess, CheckCircle,
-  Assignment, Add, Refresh, Download
+  Visibility, ExpandMore, ExpandLess, CheckCircle, Add, Refresh, Download
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { reportService } from '../services/firebaseService';
